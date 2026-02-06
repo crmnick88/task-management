@@ -10,7 +10,7 @@
     <div class="container">
         <div class="login-box">
             <h1>מערכת ניהול משימות</h1>
-            <input type="email" id="email" placeholder="אימייל">
+            <input type="text" id="username" placeholder="שם משתמש">
             <input type="password" id="password" placeholder="סיסמה">
             <button onclick="login()">התחבר</button>
             <p id="error-message" class="error"></p>
@@ -19,8 +19,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getFirestore, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7P2kKlKk",
@@ -32,30 +31,58 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
 
         window.login = async function() {
-            const email = document.getElementById('email').value;
+            const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const errorMsg = document.getElementById('error-message');
 
+            if (!username || !password) {
+                errorMsg.textContent = 'נא למלא שם משתמש וסיסמה';
+                return;
+            }
+
             try {
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                const user = userCredential.user;
+                const q = query(collection(db, 'users'), where('username', '==', username));
+                const querySnapshot = await getDocs(q);
                 
-                // בדיקה אם המשתמש הוא מנהל
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
-                
-                if (userDoc.exists() && userDoc.data().role === 'manager') {
+                if (querySnapshot.empty) {
+                    errorMsg.textContent = 'שם משתמש או סיסמה שגויים';
+                    return;
+                }
+
+                const userDoc = querySnapshot.docs[0];
+                const userData = userDoc.data();
+
+                if (userData.password !== password) {
+                    errorMsg.textContent = 'שם משתמש או סיסמה שגויים';
+                    return;
+                }
+
+                // שמירת פרטי המשתמש
+                localStorage.setItem('userId', userDoc.id);
+                localStorage.setItem('username', userData.username);
+                localStorage.setItem('role', userData.role);
+
+                // ניתוב לפי תפקיד
+                if (userData.role === 'manager') {
                     window.location.href = 'manager.html';
                 } else {
                     window.location.href = 'employee.html';
                 }
             } catch (error) {
-                errorMsg.textContent = 'שגיאה בהתחברות. בדוק את האימייל והסיסמה.';
+                console.error('Error:', error);
+                errorMsg.textContent = 'שגיאה בהתחברות';
             }
         }
+
+        // אפשרות להתחבר עם Enter
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
     </script>
 </body>
 </html>
