@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>כניסה - מערכת ניהול משימות</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="login-box">
+            <h1>מערכת ניהול משימות</h1>
+            <input type="email" id="email" placeholder="אימייל">
+            <input type="password" id="password" placeholder="סיסמה">
+            <button onclick="login()">התחבר</button>
+            <p id="error-message" class="error"></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7P2kKlKk",
+            authDomain: "task-management-2beb8.firebaseapp.com",
+            projectId: "task-management-2beb8",
+            storageBucket: "task-management-2beb8.firebasestorage.app",
+            messagingSenderId: "100466346989",
+            appId: "1:100466346989:web:7344dded39f76143b0702c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.login = async function() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('error-message');
+
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                // בדיקה אם המשתמש הוא מנהל
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                
+                if (userDoc.exists() && userDoc.data().role === 'manager') {
+                    window.location.href = 'manager.html';
+                } else {
+                    window.location.href = 'employee.html';
+                }
+            } catch (error) {
+                errorMsg.textContent = 'שגיאה בהתחברות. בדוק את האימייל והסיסמה.';
+            }
+        }
+    </script>
+</body>
+</html>
