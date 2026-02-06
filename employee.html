@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ממשק עובד - מערכת ניהול משימות</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>המשימות שלי</h1>
+            <button onclick="logout()" class="logout-btn">התנתק</button>
+        </div>
+
+        <div class="tasks-section">
+            <h2>המשימות שהוקצו לי</h2>
+            <div id="tasks-list"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getAuth, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, updateDoc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7P2kKlKk",
+            authDomain: "task-management-2beb8.firebaseapp.com",
+            projectId: "task-management-2beb8",
+            storageBucket: "task-management-2beb8.firebasestorage.app",
+            messagingSenderId: "100466346989",
+            appId: "1:100466346989:web:7344dded39f76143b0702c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUserId;
+
+        // בדיקת התחברות
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.href = 'index.html';
+            } else {
+                currentUserId = user.uid;
+                loadTasks();
+            }
+        });
+
+        window.logout = function() {
+            signOut(auth);
+        }
+
+        async function loadTasks() {
+            const tasksList = document.getElementById('tasks-list');
+            tasksList.innerHTML = '';
+
+            const q = query(
+                collection(db, 'tasks'), 
+                where('employeeId', '==', currentUserId),
+                orderBy('createdAt', 'desc')
+            );
+            const tasksSnapshot = await getDocs(q);
+
+            if (tasksSnapshot.empty) {
+                tasksList.innerHTML = '<p class="no-tasks">אין לך משימות כרגע</p>';
+                return;
+            }
+
+            tasksSnapshot.forEach((taskDoc) => {
+                const task = taskDoc.data();
+                const taskElement = document.createElement('div');
+                taskElement.className = 'task-item' + (task.completed ? ' completed' : '');
+                
+                taskElement.innerHTML = `
+                    <div class="task-content">
+                        <input type="checkbox" 
+                               id="task-${taskDoc.id}" 
+                               ${task.completed ? 'checked' : ''} 
+                               onchange="toggleTask('${taskDoc.id}', this.checked)">
+                        <label for="task-${taskDoc.id}">
+                            <strong>${task.title}</strong>
+                            ${task.description ? `<p>${task.description}</p>` : ''}
+                        </label>
+                    </div>
+                `;
+                
+                tasksList.appendChild(taskElement);
+            });
+        }
+
+        window.toggleTask = async function(taskId, completed) {
+            try {
+                await updateDoc(doc(db, 'tasks', taskId), {
+                    completed: completed
+                });
+                loadTasks();
+            } catch (error) {
+                console.error('Error updating task:', error);
+            }
+        }
+    </script>
+</body>
+</html>
