@@ -32,7 +32,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, setDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7P2kKlKk",
@@ -49,6 +49,21 @@
         window.logout = function() {
             localStorage.clear();
             window.location.href = 'index.html';
+        }
+
+        async function sendNotificationToEmployee(employeeId, taskTitle) {
+            try {
+                await setDoc(doc(db, 'notifications', Date.now().toString()), {
+                    employeeId: employeeId,
+                    title: 'משימה חדשה!',
+                    body: taskTitle,
+                    createdAt: new Date(),
+                    read: false
+                });
+                console.log('Notification sent');
+            } catch (error) {
+                console.error('Error sending notification:', error);
+            }
         }
 
         window.addTask = async function() {
@@ -71,10 +86,13 @@
                     createdAt: new Date()
                 });
 
+                await sendNotificationToEmployee(employeeId, title);
+
                 document.getElementById('task-title').value = '';
                 document.getElementById('task-description').value = '';
                 document.getElementById('task-employee').value = '';
                 
+                alert('המשימה נוצרה והתראה נשלחה לעובד!');
                 loadTasks();
             } catch (error) {
                 console.error('Error adding task:', error);
@@ -128,7 +146,6 @@
             }
         }
 
-        // טעינה ראשונית
         loadTasks();
     </script>
 </body>
