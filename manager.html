@@ -48,6 +48,12 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // הגנה: רק מנהל יכול להיכנס למסך הזה
+        const role = localStorage.getItem('role');
+        if (role !== 'manager') {
+            window.location.href = 'index.html';
+        }
+
         window.logout = function() {
             localStorage.clear();
             window.location.href = 'index.html';
@@ -56,14 +62,14 @@
         async function sendPushNotification(employeeId, taskTitle) {
             try {
                 const tokenDoc = await getDoc(doc(db, 'fcmTokens', employeeId));
-                
+
                 if (!tokenDoc.exists()) {
                     console.log('No FCM token found for employee');
                     return;
                 }
-                
+
                 const fcmToken = tokenDoc.data().token;
-                
+
                 const message = {
                     notification: {
                         title: 'משימה חדשה!',
@@ -71,7 +77,9 @@
                     },
                     token: fcmToken
                 };
-                
+
+                // כרגע אתה “שולח” התראה דרך Firestore (והעובד מאזין לקולקשן notifications)
+                // זה עובד טוב ל-MVP. בהמשך אפשר להחליף ל-Cloud Function שממש שולחת FCM.
                 await setDoc(doc(db, 'notifications', Date.now().toString()), {
                     employeeId: employeeId,
                     title: 'משימה חדשה!',
@@ -80,8 +88,8 @@
                     read: false,
                     fcmMessage: message
                 });
-                
-                console.log('Notification sent');
+
+                console.log('Notification saved (employee will pick it up)');
             } catch (error) {
                 console.error('Error sending notification:', error);
             }
@@ -112,8 +120,8 @@
                 document.getElementById('task-title').value = '';
                 document.getElementById('task-description').value = '';
                 document.getElementById('task-employee').value = '';
-                
-                alert('המשימה נוצרה והתראה נשלחה לעובד!');
+
+                alert('המשימה נוצרה וההתראה נשמרה לעובד!');
                 loadTasks();
             } catch (error) {
                 console.error('Error adding task:', error);
@@ -138,7 +146,7 @@
                     const task = taskDoc.data();
                     const taskElement = document.createElement('div');
                     taskElement.className = 'task-item' + (task.completed ? ' completed' : '');
-                    
+
                     taskElement.innerHTML = `
                         <div>
                             <strong>${task.title}</strong>
@@ -148,7 +156,7 @@
                         </div>
                         <button onclick="deleteTask('${taskDoc.id}')" class="delete-btn">מחק</button>
                     `;
-                    
+
                     tasksList.appendChild(taskElement);
                 });
             } catch (error) {
