@@ -19,7 +19,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getFirestore, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7P2kKlKk",
@@ -33,7 +33,13 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        window.login = async function() {
+        // משתמשים מוגדרים
+        const users = {
+            'sagi': { password: '102', role: 'manager', name: 'שגיא', id: 'manager1' },
+            'hai': { password: 'hai', role: 'employee', name: 'חי', id: 'employee1' }
+        };
+
+        window.login = function() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const errorMsg = document.getElementById('error-message');
@@ -43,37 +49,24 @@
                 return;
             }
 
-            try {
-                const q = query(collection(db, 'users'), where('username', '==', username));
-                const querySnapshot = await getDocs(q);
-                
-                if (querySnapshot.empty) {
-                    errorMsg.textContent = 'שם משתמש או סיסמה שגויים';
-                    return;
-                }
+            const user = users[username];
 
-                const userDoc = querySnapshot.docs[0];
-                const userData = userDoc.data();
+            if (!user || user.password !== password) {
+                errorMsg.textContent = 'שם משתמש או סיסמה שגויים';
+                return;
+            }
 
-                if (userData.password !== password) {
-                    errorMsg.textContent = 'שם משתמש או סיסמה שגויים';
-                    return;
-                }
+            // שמירת פרטי המשתמש
+            localStorage.setItem('userId', user.id);
+            localStorage.setItem('username', username);
+            localStorage.setItem('name', user.name);
+            localStorage.setItem('role', user.role);
 
-                // שמירת פרטי המשתמש
-                localStorage.setItem('userId', userDoc.id);
-                localStorage.setItem('username', userData.username);
-                localStorage.setItem('role', userData.role);
-
-                // ניתוב לפי תפקיד
-                if (userData.role === 'manager') {
-                    window.location.href = 'manager.html';
-                } else {
-                    window.location.href = 'employee.html';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                errorMsg.textContent = 'שגיאה בהתחברות';
+            // ניתוב לפי תפקיד
+            if (user.role === 'manager') {
+                window.location.href = 'manager.html';
+            } else {
+                window.location.href = 'employee.html';
             }
         }
 
@@ -83,6 +76,9 @@
                 login();
             }
         });
+
+        // חשוף db לשימוש גלובלי
+        window.db = db;
     </script>
 </body>
 </html>
