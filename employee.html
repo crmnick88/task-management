@@ -1,157 +1,203 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ממשק עובד - מערכת ניהול משימות</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#667eea">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>המשימות שלי</title>
+
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" href="./icon-192.png">
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+
+    <link rel="stylesheet" href="./styles.css">
 
     <style>
-        .token-box{
-            background:#f2f2f2;
-            padding:10px;
-            border-radius:8px;
-            margin:10px 0;
-            font-size:12px;
-            word-break:break-all;
+        body {
+            font-family: Arial;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            padding: 20px;
         }
-        .copy-btn{
-            margin-top:8px;
-            background:#4CAF50;
-            color:white;
-            border:none;
-            padding:6px 12px;
-            border-radius:6px;
-            cursor:pointer;
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            width: 100%;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .task-item {
+            background: #f3f3f3;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .token-box {
+            font-size: 11px;
+            word-break: break-all;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 
 <body>
-<div class="container">
 
-    <div class="header">
-        <h1>המשימות שלי</h1>
-        <button onclick="logout()" class="logout-btn">התנתק</button>
+    <div class="card">
+        <h2>המשימות שלי</h2>
+
+        <div class="token-box" id="tokenBox">טוען טוקן...</div>
+
+        <button onclick="copyToken()">העתק טוקן</button>
     </div>
 
-    <!-- 🔥 חדש: תצוגת טוקן -->
-    <div class="token-box" id="tokenBox" style="display:none">
-        <strong>FCM Token:</strong>
-        <div id="tokenText"></div>
-        <button class="copy-btn" onclick="copyToken()">העתק טוקן</button>
-    </div>
-
-    <div class="tasks-section">
-        <h2>המשימות שהוקצו לי</h2>
+    <div class="card">
+        <h3>המשימות שהוקצו לי</h3>
         <div id="tasks-list"></div>
     </div>
 
-</div>
+    <script>
+        /* ===============================
+           🔥 Firebase Config (שלך – לא לגעת)
+        =============================== */
 
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getFirestore, collection, getDocs, doc, updateDoc, query, where, onSnapshot, setDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js';
+        const firebaseConfig = {
+            apiKey: "AIzaSyC2gI8SbTx81sZsXPjctfEesfn7PZkKlKk",
+            authDomain: "task-management-2beb8.firebaseapp.com",
+            projectId: "task-management-2beb8",
+            storageBucket: "task-management-2beb8.firebasestorage.app",
+            messagingSenderId: "1004663469893",
+            appId: "1:1004663469893:web:7344dded39f76143b0702c"
+        };
 
+        firebase.initializeApp(firebaseConfig);
 
-/* ===============================
-   ❗ הקונפיג שלך – לא נגעתי
-================================ */
-const firebaseConfig = {
-  apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7PZkKlKk",
-  authDomain: "task-management-2beb8.firebaseapp.com",
-  projectId: "task-management-2beb8",
-  storageBucket: "task-management-2beb8.firebasestorage.app",
-  messagingSenderId: "1004663469893",
-  appId: "1:1004663469893:web:7344dded39f76143b0702c"
-};
+        const db = firebase.firestore();
+        const messaging = firebase.messaging();
 
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const messaging = getMessaging(app);
-
-const userId = localStorage.getItem('userId');
-
-if (!userId) {
-    window.location.href = 'index.html';
-}
+        const userId = "employee1";
 
 
-/* ===============================
-   הרשאת פוש + טוקן
-================================ */
-async function requestNotificationPermission() {
-    try {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
+        /* ===============================
+           🔥 Service Worker
+        =============================== */
 
-        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        navigator.serviceWorker.register('./firebase-messaging-sw.js');
 
-        const token = await getToken(messaging, {
-            vapidKey: 'BB9MsNo5DbhZ1kIBRxeAtnIWxGbFZ7y-xuQbUduwHNOKxVMMfkXad8jJaM-Rjfl7RcI-y9wwAFNB8Bj57BvHSfI',
-            serviceWorkerRegistration: registration
-        });
 
-        if (token) {
+        /* ===============================
+           🔥 בקשת הרשאות + טוקן
+        =============================== */
 
-            console.log("FCM Token:", token);
+        async function requestPermission() {
 
-            /* 🔥 הצגת טוקן במסך */
-            window.currentToken = token;
-            document.getElementById('tokenText').innerText = token;
-            document.getElementById('tokenBox').style.display = 'block';
+            const permission = await Notification.requestPermission();
 
-            await setDoc(doc(db, 'fcmTokens', userId), {
+            if (permission !== 'granted') return;
+
+            const token = await messaging.getToken({
+                vapidKey: 'YOUR_VAPID_KEY_HERE'
+            });
+
+            if (!token) return;
+
+            document.getElementById('tokenBox').innerText = token;
+
+            await db.collection('fcmTokens').doc(userId).set({
                 token,
                 userId,
                 updatedAt: new Date()
             });
 
-            localStorage.setItem('fcmToken', token);
+            console.log("Token saved:", token);
         }
 
-       
 
-    } catch (err) {
-        console.error(err);
-    }
-}
+        /* ===============================
+           🔥 פוש כשהאפליקציה פתוחה
+        =============================== */
 
+        messaging.onMessage(payload => {
 
-/* ===============================
-   העתקה ללוח
-================================ */
-window.copyToken = async function () {
-    const token = window.currentToken || localStorage.getItem('fcmToken');
-    await navigator.clipboard.writeText(token);
-    alert("הטוקן הועתק ✅");
-};
+            console.log("Push received:", payload);
 
-
-/* ===============================
-   הודעות בזמן אמת
-================================ */
-onMessage(messaging, (payload) => {
-    new Notification(
-        payload.notification?.title || "התראה",
-        { body: payload.notification?.body || "", icon: './icon-192.png' }
-    );
-});
+            new Notification(
+                payload.notification.title,
+                {
+                    body: payload.notification.body
+                }
+            );
+        });
 
 
-/* ===============================
-   שאר הקוד שלך – ללא שינוי
-================================ */
-window.logout = () => {
-    localStorage.clear();
-    window.location.href = 'index.html';
-};
+        /* ===============================
+           🔥 האזנה למשימות בזמן אמת
+        =============================== */
 
-requestNotificationPermission();
-</script>
+        function listenForTasks() {
+
+            db.collection('tasks')
+                .where('userId', '==', userId)
+                .onSnapshot(snapshot => {
+
+                    const list = document.getElementById('tasks-list');
+                    list.innerHTML = '';
+
+                    snapshot.forEach(doc => {
+
+                        const task = doc.data();
+
+                        const div = document.createElement('div');
+                        div.className = 'task-item';
+
+                        div.innerHTML = `
+                            <b>${task.title}</b><br>
+                            ${task.description || ''}
+                        `;
+
+                        list.appendChild(div);
+                    });
+                });
+        }
+
+
+        /* ===============================
+           🔥 העתק טוקן
+        =============================== */
+
+        function copyToken() {
+            navigator.clipboard.writeText(
+                document.getElementById('tokenBox').innerText
+            );
+            alert("הועתק!");
+        }
+
+
+        /* ===============================
+           🔥 INIT
+        =============================== */
+
+        requestPermission();
+        listenForTasks();
+
+    </script>
+
 </body>
+
 </html>
