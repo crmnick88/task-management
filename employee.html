@@ -21,7 +21,6 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getAuth, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, collection, getDocs, doc, updateDoc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
@@ -34,61 +33,61 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
 
-        let currentUserId;
-
         // בדיקת התחברות
-        onAuthStateChanged(auth, (user) => {
-            if (!user) {
-                window.location.href = 'index.html';
-            } else {
-                currentUserId = user.uid;
-                loadTasks();
-            }
-        });
+        const role = localStorage.getItem('role');
+        const userId = localStorage.getItem('userId');
+        
+        if (!role || role !== 'employee' || !userId) {
+            window.location.href = 'index.html';
+        }
 
         window.logout = function() {
-            signOut(auth);
+            localStorage.clear();
+            window.location.href = 'index.html';
         }
 
         async function loadTasks() {
             const tasksList = document.getElementById('tasks-list');
             tasksList.innerHTML = '';
 
-            const q = query(
-                collection(db, 'tasks'), 
-                where('employeeId', '==', currentUserId),
-                orderBy('createdAt', 'desc')
-            );
-            const tasksSnapshot = await getDocs(q);
+            try {
+                const q = query(
+                    collection(db, 'tasks'), 
+                    where('employeeId', '==', userId),
+                    orderBy('createdAt', 'desc')
+                );
+                const tasksSnapshot = await getDocs(q);
 
-            if (tasksSnapshot.empty) {
-                tasksList.innerHTML = '<p class="no-tasks">אין לך משימות כרגע</p>';
-                return;
+                if (tasksSnapshot.empty) {
+                    tasksList.innerHTML = '<p class="no-tasks">אין לך משימות כרגע</p>';
+                    return;
+                }
+
+                tasksSnapshot.forEach((taskDoc) => {
+                    const task = taskDoc.data();
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task-item' + (task.completed ? ' completed' : '');
+                    
+                    taskElement.innerHTML = `
+                        <div class="task-content">
+                            <input type="checkbox" 
+                                   id="task-${taskDoc.id}" 
+                                   ${task.completed ? 'checked' : ''} 
+                                   onchange="toggleTask('${taskDoc.id}', this.checked)">
+                            <label for="task-${taskDoc.id}">
+                                <strong>${task.title}</strong>
+                                ${task.description ? `<p>${task.description}</p>` : ''}
+                            </label>
+                        </div>
+                    `;
+                    
+                    tasksList.appendChild(taskElement);
+                });
+            } catch (error) {
+                console.error('Error loading tasks:', error);
             }
-
-            tasksSnapshot.forEach((taskDoc) => {
-                const task = taskDoc.data();
-                const taskElement = document.createElement('div');
-                taskElement.className = 'task-item' + (task.completed ? ' completed' : '');
-                
-                taskElement.innerHTML = `
-                    <div class="task-content">
-                        <input type="checkbox" 
-                               id="task-${taskDoc.id}" 
-                               ${task.completed ? 'checked' : ''} 
-                               onchange="toggleTask('${taskDoc.id}', this.checked)">
-                        <label for="task-${taskDoc.id}">
-                            <strong>${task.title}</strong>
-                            ${task.description ? `<p>${task.description}</p>` : ''}
-                        </label>
-                    </div>
-                `;
-                
-                tasksList.appendChild(taskElement);
-            });
         }
 
         window.toggleTask = async function(taskId, completed) {
@@ -101,6 +100,9 @@
                 console.error('Error updating task:', error);
             }
         }
+
+        // טעינה ראשונית
+        loadTasks();
     </script>
 </body>
 </html>
