@@ -41,20 +41,31 @@
 
         const userId = localStorage.getItem('userId');
 
+        if (!userId) {
+            // לא מחובר - חזרה למסך כניסה
+            window.location.href = 'index.html';
+        }
+
         async function requestNotificationPermission() {
             try {
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
                     console.log('Notification permission granted');
-                    
-                    const registration = await navigator.serviceWorker.register('/task-management/firebase-messaging-sw.js');
+
+                    if (!('serviceWorker' in navigator)) {
+                        console.warn('Service Worker not supported in this browser');
+                        return;
+                    }
+
+                    // רישום Service Worker בצורה יחסית כדי שיעבוד גם ב-GitHub Pages וגם מקומית
+                    const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
                     console.log('Service Worker registered:', registration);
-                    
+
                     const token = await getToken(messaging, {
                         vapidKey: 'BB9MsNo5DbhZ1kIBRxeAtnIWxGbFZ7y-xuQbUduwHNOKxVMMfkXad8jJaM-Rjfl7RcI-y9wwAFNB8Bj57BvHSfI',
                         serviceWorkerRegistration: registration
                     });
-                    
+
                     if (token) {
                         console.log('FCM Token:', token);
                         await setDoc(doc(db, 'fcmTokens', userId), {
@@ -64,7 +75,7 @@
                         });
                         localStorage.setItem('fcmToken', token);
                     }
-                    
+
                     listenForNotifications();
                 }
             } catch (error) {
@@ -83,18 +94,18 @@
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
                         const notification = change.doc.data();
-                        
+
                         if (Notification.permission === 'granted') {
                             new Notification(notification.title, {
                                 body: notification.body,
-                                icon: '/task-management/icon-192.png'
+                                icon: './icon-192.png'
                             });
                         }
-                        
+
                         updateDoc(doc(db, 'notifications', change.doc.id), {
                             read: true
                         });
-                        
+
                         loadTasks();
                     }
                 });
@@ -103,17 +114,17 @@
 
         onMessage(messaging, (payload) => {
             console.log('Message received:', payload);
-            
-            const notificationTitle = payload.notification.title;
+
+            const notificationTitle = payload.notification?.title || 'התראה';
             const notificationOptions = {
-                body: payload.notification.body,
-                icon: '/task-management/icon-192.png'
+                body: payload.notification?.body || '',
+                icon: './icon-192.png'
             };
 
             if (Notification.permission === 'granted') {
                 new Notification(notificationTitle, notificationOptions);
             }
-            
+
             loadTasks();
         });
 
@@ -128,7 +139,7 @@
 
             try {
                 const q = query(
-                    collection(db, 'tasks'), 
+                    collection(db, 'tasks'),
                     where('employeeId', '==', userId)
                 );
                 const tasksSnapshot = await getDocs(q);
@@ -142,12 +153,12 @@
                     const task = taskDoc.data();
                     const taskElement = document.createElement('div');
                     taskElement.className = 'task-item' + (task.completed ? ' completed' : '');
-                    
+
                     taskElement.innerHTML = `
                         <div class="task-content">
-                            <input type="checkbox" 
-                                   id="task-${taskDoc.id}" 
-                                   ${task.completed ? 'checked' : ''} 
+                            <input type="checkbox"
+                                   id="task-${taskDoc.id}"
+                                   ${task.completed ? 'checked' : ''}
                                    onchange="toggleTask('${taskDoc.id}', this.checked)">
                             <label for="task-${taskDoc.id}">
                                 <strong>${task.title}</strong>
@@ -155,7 +166,7 @@
                             </label>
                         </div>
                     `;
-                    
+
                     tasksList.appendChild(taskElement);
                 });
             } catch (error) {
