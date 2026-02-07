@@ -6,7 +6,7 @@
     <title>כניסה - מערכת ניהול משימות</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#667eea">
 </head>
 <body>
     <div class="container">
@@ -40,6 +40,14 @@
             'sagi': { password: '102', role: 'manager', name: 'שגיא', id: 'manager1' },
             'hai': { password: 'hai', role: 'employee', name: 'חי', id: 'employee1' }
         };
+
+        // אם כבר מחובר - דילוג אוטומטי
+        const existingRole = localStorage.getItem('role');
+        if (existingRole === 'manager') {
+            window.location.href = 'manager.html';
+        } else if (existingRole === 'employee') {
+            window.location.href = 'employee.html';
+        }
 
         window.login = function() {
             const username = document.getElementById('username').value.trim();
@@ -79,7 +87,7 @@
             }
         });
 
-        // חשוף db לשימוש גלובלי
+        // חשוף db לשימוש גלובלי (אם תרצה בעתיד)
         window.db = db;
     </script>
 </body>
