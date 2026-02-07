@@ -19,6 +19,7 @@
             <textarea id="task-description" placeholder="תיאור המשימה (אופציונלי)"></textarea>
             <select id="task-employee">
                 <option value="">בחר עובד</option>
+                <option value="employee1">חי</option>
             </select>
             <button onclick="addTask()">הוסף משימה</button>
         </div>
@@ -31,7 +32,6 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getAuth, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
@@ -44,40 +44,22 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
 
         // בדיקת התחברות
-        onAuthStateChanged(auth, (user) => {
-            if (!user) {
-                window.location.href = 'index.html';
-            } else {
-                loadEmployees();
-                loadTasks();
-            }
-        });
-
-        window.logout = function() {
-            signOut(auth);
+        const role = localStorage.getItem('role');
+        if (!role || role !== 'manager') {
+            window.location.href = 'index.html';
         }
 
-        async function loadEmployees() {
-            const employeesSnapshot = await getDocs(collection(db, 'users'));
-            const select = document.getElementById('task-employee');
-            
-            employeesSnapshot.forEach((doc) => {
-                if (doc.data().role === 'employee') {
-                    const option = document.createElement('option');
-                    option.value = doc.id;
-                    option.textContent = doc.data().name;
-                    select.appendChild(option);
-                }
-            });
+        window.logout = function() {
+            localStorage.clear();
+            window.location.href = 'index.html';
         }
 
         window.addTask = async function() {
-            const title = document.getElementById('task-title').value;
-            const description = document.getElementById('task-description').value;
+            const title = document.getElementById('task-title').value.trim();
+            const description = document.getElementById('task-description').value.trim();
             const employeeId = document.getElementById('task-employee').value;
 
             if (!title || !employeeId) {
@@ -90,6 +72,7 @@
                     title: title,
                     description: description,
                     employeeId: employeeId,
+                    employeeName: employeeId === 'employee1' ? 'חי' : '',
                     completed: false,
                     createdAt: new Date()
                 });
@@ -101,6 +84,7 @@
                 loadTasks();
             } catch (error) {
                 console.error('Error adding task:', error);
+                alert('שגיאה בהוספת משימה');
             }
         }
 
@@ -108,40 +92,50 @@
             const tasksList = document.getElementById('tasks-list');
             tasksList.innerHTML = '';
 
-            const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
-            const tasksSnapshot = await getDocs(q);
-            const usersSnapshot = await getDocs(collection(db, 'users'));
-            
-            const usersMap = {};
-            usersSnapshot.forEach((doc) => {
-                usersMap[doc.id] = doc.data().name;
-            });
+            try {
+                const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+                const tasksSnapshot = await getDocs(q);
 
-            tasksSnapshot.forEach((taskDoc) => {
-                const task = taskDoc.data();
-                const taskElement = document.createElement('div');
-                taskElement.className = 'task-item' + (task.completed ? ' completed' : '');
-                
-                taskElement.innerHTML = `
-                    <div>
-                        <strong>${task.title}</strong>
-                        ${task.description ? `<p>${task.description}</p>` : ''}
-                        <small>עובד: ${usersMap[task.employeeId] || 'לא ידוע'}</small>
-                        <small>סטטוס: ${task.completed ? 'הושלם ✓' : 'ממתין'}</small>
-                    </div>
-                    <button onclick="deleteTask('${taskDoc.id}')" class="delete-btn">מחק</button>
-                `;
-                
-                tasksList.appendChild(taskElement);
-            });
+                if (tasksSnapshot.empty) {
+                    tasksList.innerHTML = '<p class="no-tasks">אין משימות עדיין</p>';
+                    return;
+                }
+
+                tasksSnapshot.forEach((taskDoc) => {
+                    const task = taskDoc.data();
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task-item' + (task.completed ? ' completed' : '');
+                    
+                    taskElement.innerHTML = `
+                        <div>
+                            <strong>${task.title}</strong>
+                            ${task.description ? `<p>${task.description}</p>` : ''}
+                            <small>עובד: ${task.employeeName || 'לא ידוע'}</small>
+                            <small>סטטוס: ${task.completed ? 'הושלם ✓' : 'ממתין'}</small>
+                        </div>
+                        <button onclick="deleteTask('${taskDoc.id}')" class="delete-btn">מחק</button>
+                    `;
+                    
+                    tasksList.appendChild(taskElement);
+                });
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
         }
 
         window.deleteTask = async function(taskId) {
             if (confirm('האם אתה בטוח שברצונך למחוק משימה זו?')) {
-                await deleteDoc(doc(db, 'tasks', taskId));
-                loadTasks();
+                try {
+                    await deleteDoc(doc(db, 'tasks', taskId));
+                    loadTasks();
+                } catch (error) {
+                    console.error('Error deleting task:', error);
+                }
             }
         }
+
+        // טעינה ראשונית
+        loadTasks();
     </script>
 </body>
 </html>
