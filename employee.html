@@ -22,6 +22,7 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getFirestore, collection, getDocs, doc, updateDoc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7P2kKlKk",
@@ -34,14 +35,49 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const messaging = getMessaging(app);
 
-        // בדיקת התחברות
-        const role = localStorage.getItem('role');
         const userId = localStorage.getItem('userId');
-        
-        if (!role || role !== 'employee' || !userId) {
-            window.location.href = 'index.html';
+
+        // בקשת הרשאה להתראות
+        async function requestNotificationPermission() {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    console.log('Notification permission granted');
+                    
+                    // קבלת טוקן
+                    const token = await getToken(messaging, {
+                        vapidKey: 'BB9MsNo5DbhZ1kIBRxeAtnIWxGbFZ7y-xuQbUduwHNOKxVMMfkXad8jJaM-Rjfl7RcI-y9wwAFNB8Bj57BvHSfI'
+                    });
+                    
+                    if (token) {
+                        console.log('FCM Token:', token);
+                        // שמירת הטוקן
+                        localStorage.setItem('fcmToken', token);
+                    }
+                }
+            } catch (error) {
+                console.error('Error getting permission:', error);
+            }
         }
+
+        // מאזין להתראות כשהאפליקציה פתוחה
+        onMessage(messaging, (payload) => {
+            console.log('Message received:', payload);
+            
+            const notificationTitle = payload.notification.title;
+            const notificationOptions = {
+                body: payload.notification.body,
+            };
+
+            if (Notification.permission === 'granted') {
+                new Notification(notificationTitle, notificationOptions);
+            }
+            
+            // רענון רשימת המשימות
+            loadTasks();
+        });
 
         window.logout = function() {
             localStorage.clear();
@@ -55,8 +91,7 @@
             try {
                 const q = query(
                     collection(db, 'tasks'), 
-                    where('employeeId', '==', userId),
-                    orderBy('createdAt', 'desc')
+                    where('employeeId', '==', userId)
                 );
                 const tasksSnapshot = await getDocs(q);
 
@@ -102,6 +137,7 @@
         }
 
         // טעינה ראשונית
+        requestNotificationPermission();
         loadTasks();
     </script>
 </body>
