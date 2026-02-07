@@ -6,7 +6,7 @@
     <title>ממשק מנהל - מערכת ניהול משימות</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#667eea">
 </head>
 <body>
     <div class="container">
@@ -34,7 +34,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, setDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7P2kKlKk",
@@ -53,15 +53,34 @@
             window.location.href = 'index.html';
         }
 
-        async function sendNotificationToEmployee(employeeId, taskTitle) {
+        async function sendPushNotification(employeeId, taskTitle) {
             try {
+                const tokenDoc = await getDoc(doc(db, 'fcmTokens', employeeId));
+                
+                if (!tokenDoc.exists()) {
+                    console.log('No FCM token found for employee');
+                    return;
+                }
+                
+                const fcmToken = tokenDoc.data().token;
+                
+                const message = {
+                    notification: {
+                        title: 'משימה חדשה!',
+                        body: taskTitle
+                    },
+                    token: fcmToken
+                };
+                
                 await setDoc(doc(db, 'notifications', Date.now().toString()), {
                     employeeId: employeeId,
                     title: 'משימה חדשה!',
                     body: taskTitle,
                     createdAt: new Date(),
-                    read: false
+                    read: false,
+                    fcmMessage: message
                 });
+                
                 console.log('Notification sent');
             } catch (error) {
                 console.error('Error sending notification:', error);
@@ -88,7 +107,7 @@
                     createdAt: new Date()
                 });
 
-                await sendNotificationToEmployee(employeeId, title);
+                await sendPushNotification(employeeId, title);
 
                 document.getElementById('task-title').value = '';
                 document.getElementById('task-description').value = '';
