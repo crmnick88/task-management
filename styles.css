@@ -141,7 +141,8 @@ button:active {
 }
 
 .task-item:hover {
-    transform: translateX(-5px);
+    /* RTL: הזזה לכיוון הנכון */
+    transform: translateX(5px);
 }
 
 .task-item.completed {
@@ -215,12 +216,12 @@ button:active {
     .container {
         padding: 10px;
     }
-    
+
     .header {
         flex-direction: column;
         gap: 15px;
     }
-    
+
     .logout-btn {
         width: 100%;
     }
