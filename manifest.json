@@ -2,7 +2,7 @@
   "name": "מערכת ניהול משימות",
   "short_name": "משימות",
   "description": "מערכת לניהול משימות לעובדים",
-  "start_url": "/task-management/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#667eea",
   "theme_color": "#667eea",
