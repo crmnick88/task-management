@@ -6,7 +6,7 @@
     <title>ממשק עובד - מערכת ניהול משימות</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#667eea">
 </head>
 <body>
     <div class="container">
@@ -23,8 +23,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getFirestore, collection, getDocs, doc, updateDoc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js';
+        import { getFirestore, collection, getDocs, doc, updateDoc, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyC2gl8SbTx81sZsXPjctfEesfn7P2kKlKk",
@@ -37,44 +36,53 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const messaging = getMessaging(app);
 
         const userId = localStorage.getItem('userId');
 
+        // בקשת הרשאה והצגת התראות מ-Firestore
         async function requestNotificationPermission() {
             try {
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
                     console.log('Notification permission granted');
-                    
-                    const token = await getToken(messaging, {
-                        vapidKey: 'BB9MsNo5DbhZ1kIBRxeAtnIWxGbFZ7y-xuQbUduwHNOKxVMMfkXad8jJaM-Rjfl7RcI-y9wwAFNB8Bj57BvHSfI'
-                    });
-                    
-                    if (token) {
-                        console.log('FCM Token:', token);
-                        localStorage.setItem('fcmToken', token);
-                    }
+                    listenForNotifications();
                 }
             } catch (error) {
                 console.error('Error getting permission:', error);
             }
         }
 
-        onMessage(messaging, (payload) => {
-            console.log('Message received:', payload);
-            
-            const notificationTitle = payload.notification.title;
-            const notificationOptions = {
-                body: payload.notification.body,
-            };
+        // האזנה להתראות חדשות
+        function listenForNotifications() {
+            const q = query(
+                collection(db, 'notifications'),
+                where('employeeId', '==', userId),
+                where('read', '==', false)
+            );
 
-            if (Notification.permission === 'granted') {
-                new Notification(notificationTitle, notificationOptions);
-            }
-            
-            loadTasks();
-        });
+            onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const notification = change.doc.data();
+                        
+                        if (Notification.permission === 'granted') {
+                            new Notification(notification.title, {
+                                body: notification.body,
+                                icon: '/task-management/icon-192.png'
+                            });
+                        }
+                        
+                        // סימון כנקרא
+                        updateDoc(doc(db, 'notifications', change.doc.id), {
+                            read: true
+                        });
+                        
+                        // רענון רשימת המשימות
+                        loadTasks();
+                    }
+                });
+            });
+        }
 
         window.logout = function() {
             localStorage.clear();
